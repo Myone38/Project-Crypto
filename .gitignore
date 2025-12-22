@@ -416,3 +416,23 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Ignorés du Projet
+
+.venv/
+venv/
+
+__pycache__/
+*.pyc
+*.pyo
+
+.env
+
+.vscode/
+
+.DS_Store
+Thumbs.db
+
+# Config
+config.json
+credentials.json
