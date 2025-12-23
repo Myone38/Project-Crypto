@@ -391,8 +391,8 @@ class Database:
             if not row:
                 return None
             ts_str = row[0]
-            # Remove trailing Z if present
-            return datetime.fromisoformat(ts_str.rstrip('Z'))
+            # Remove trailing Z if present and return timezone-aware UTC datetime
+            return datetime.fromisoformat(ts_str.rstrip('Z')).replace(tzinfo=timezone.utc)
         except Exception as e:
             print(f"❌ Erreur get_latest_candle_timestamp: {e}")
             return None
@@ -413,7 +413,8 @@ class Database:
             if not row:
                 return None
             ts_str = row[0]
-            return datetime.fromisoformat(ts_str.rstrip('Z'))
+            # Remove trailing Z if present and return timezone-aware UTC datetime
+            return datetime.fromisoformat(ts_str.rstrip('Z')).replace(tzinfo=timezone.utc)
         except Exception as e:
             print(f"❌ Erreur get_earliest_candle_timestamp: {e}")
             return None

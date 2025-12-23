@@ -114,7 +114,7 @@ class CandleFetcher:
         start_target = now - timedelta(days=365 * years)
 
         earliest = self.db.get_earliest_candle_timestamp(market, interval)
-        latest = self.db.get_latest_candle_timestamp(market, interval)
+        latest = getattr(self.db, 'get_latest_candle_timestamp', lambda m, i: None)(market, interval)
 
         total_inserted = 0
 
@@ -150,7 +150,7 @@ class CandleFetcher:
                 return False
             latest_candle = page[-1]
             ts_ms = int(latest_candle[0])
-            ts_dt = datetime.utcfromtimestamp(ts_ms / 1000)
+            ts_dt = datetime.fromtimestamp(ts_ms / 1000, timezone.utc)
 
             if latest_db is None or ts_dt > latest_db:
                 # Insert this single candle
