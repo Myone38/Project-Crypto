@@ -39,3 +39,8 @@ Brief: Dashboard et moteur de trading pour Bitvavo (Dash + background engine).
 - Le bot lit d'abord les variables d'environnement; si elles sont absentes, il tente un fallback sur `config/credentials.json`.
 
 ---
+
+## Continuous Integration (CI) ✅
+
+A GitHub Actions workflow (`.github/workflows/ci.yml`) runs the test suite on every push and pull request targeting `main`.
+
