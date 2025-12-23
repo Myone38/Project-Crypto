@@ -60,3 +60,5 @@ This ensures PRs cannot be merged unless CI is green.
 
 A GitHub Actions workflow (`.github/workflows/ci.yml`) runs the test suite on every push and pull request targeting `main`.
 
+A new **auto-fix** job runs `ruff --fix` on pull requests and will open a pull request with the formatting/lint fixes when changes are made automatically (labelled `autofix`).
+
