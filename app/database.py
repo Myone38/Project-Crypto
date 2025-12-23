@@ -273,8 +273,9 @@ class Database:
     def save_candles(self, market: str, interval: str, candles: List[List]) -> int:
         """
         Enregistre des bougies (format Bitvavo)
-        candles = [[timestamp, open, high, low, close, volume], ...]
+        candles = [[timestamp_ms, open, high, low, close, volume], ...]
         Retourne le nombre de bougies insérées
+        Stocke les timestamps en UTC ISO 8601 (ex: 2025-12-23T12:34:56Z)
         """
         try:
             with self.lock:
@@ -284,8 +285,10 @@ class Database:
                 inserted = 0
                 for candle in candles:
                     try:
-                        timestamp = datetime.fromtimestamp(candle[0] / 1000)
-                        
+                        # Convert milliseconds timestamp to UTC iso string
+                        ts = datetime.utcfromtimestamp(candle[0] / 1000)
+                        ts_iso = ts.replace(microsecond=0).isoformat() + 'Z'
+
                         cursor.execute('''
                             INSERT OR IGNORE INTO market_candles 
                             (market, interval, timestamp, open, high, low, close, volume)
@@ -293,7 +296,7 @@ class Database:
                         ''', (
                             market,
                             interval,
-                            timestamp,
+                            ts_iso,
                             float(candle[1]),  # open
                             float(candle[2]),  # high
                             float(candle[3]),  # low
@@ -316,28 +319,108 @@ class Database:
             return 0
     
     def get_candles(self, market: str, interval: str, 
-                   limit: int = 100) -> List[Dict]:
-        """Récupère les dernières bougies"""
+                   limit: int = 100, start: Optional[datetime] = None, end: Optional[datetime] = None) -> List[Dict]:
+        """Récupère les dernières bougies ou une plage si start/end fournis
+        start/end doivent être des objets datetime (UTC)."""
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
-            
-            cursor.execute('''
+
+            params = [market, interval]
+            where = 'WHERE market = ? AND interval = ?'
+
+            if start:
+                where += ' AND timestamp >= ?'
+                params.append(start.replace(microsecond=0).isoformat() + 'Z')
+            if end:
+                where += ' AND timestamp <= ?'
+                params.append(end.replace(microsecond=0).isoformat() + 'Z')
+
+            query = f'''
                 SELECT timestamp, open, high, low, close, volume
                 FROM market_candles
-                WHERE market = ? AND interval = ?
+                {where}
                 ORDER BY timestamp DESC
                 LIMIT ?
-            ''', (market, interval, limit))
-            
+            '''
+            params.append(limit)
+
+            cursor.execute(query, tuple(params))
+
             columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
             result = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            
+
             conn.close()
             return list(reversed(result))  # Ordre chronologique
         except Exception as e:
             print(f"❌ Erreur get_candles: {e}")
             return []
+
+    def insert_candle(self, market: str, interval: str, timestamp: datetime, open: float, high: float, low: float, close: float, volume: float) -> bool:
+        """Insert a single candle with timestamp as UTC datetime."""
+        try:
+            with self.lock:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+                ts_iso = timestamp.replace(microsecond=0).isoformat() + 'Z'
+                cursor.execute('''
+                    INSERT OR IGNORE INTO market_candles
+                    (market, interval, timestamp, open, high, low, close, volume)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (market, interval, ts_iso, open, high, low, close, volume))
+                conn.commit()
+                conn.close()
+                return cursor.rowcount > 0
+        except Exception as e:
+            print(f"❌ Erreur insert_candle: {e}")
+            return False
+
+    def get_latest_candle_timestamp(self, market: str, interval: str) -> Optional[datetime]:
+        """Retourne le timestamp UTC (datetime) de la dernière bougie stockée, ou None."""
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT timestamp FROM market_candles
+                WHERE market = ? AND interval = ?
+                ORDER BY timestamp DESC
+                LIMIT 1
+            ''', (market, interval))
+            row = cursor.fetchone()
+            conn.close()
+            if not row:
+                return None
+            ts_str = row[0]
+            # Remove trailing Z if present
+            return datetime.fromisoformat(ts_str.rstrip('Z'))
+        except Exception as e:
+            print(f"❌ Erreur get_latest_candle_timestamp: {e}")
+            return None
+
+    def get_earliest_candle_timestamp(self, market: str, interval: str) -> Optional[datetime]:
+        """Retourne le timestamp UTC (datetime) de la première bougie stockée, ou None."""
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT timestamp FROM market_candles
+                WHERE market = ? AND interval = ?
+                ORDER BY timestamp ASC
+                LIMIT 1
+            ''', (market, interval))
+            row = cursor.fetchone()
+            conn.close()
+            if not row:
+                return None
+            ts_str = row[0]
+            return datetime.fromisoformat(ts_str.rstrip('Z'))
+        except Exception as e:
+            print(f"❌ Erreur get_earliest_candle_timestamp: {e}")
+            return None
+
+    def get_candles_range(self, market: str, interval: str, start: datetime, end: datetime) -> List[Dict]:
+        """Retourne toutes les bougies pour un intervalle start-end (UTC)."""
+        return self.get_candles(market, interval, limit=10000000, start=start, end=end)
     
     # ================================================================
     # MÉTHODES INDICATEURS
@@ -441,8 +524,8 @@ class Database:
             print(f"❌ Erreur get_stats: {e}")
             return {}
     
-    def cleanup_old_data(self, days_to_keep: int = 90):
-        """Nettoie les données anciennes"""
+    def cleanup_old_data(self, days_to_keep: int = 365 * 3):
+        """Nettoie les données anciennes (par défaut: 3 ans glissants)"""
         try:
             with self.lock:
                 conn = self._get_connection()
