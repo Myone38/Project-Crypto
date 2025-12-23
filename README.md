@@ -1,6 +1,22 @@
 # Project-Crypto
 
+[![CI](https://github.com/Myone38/Project-Crypto/actions/workflows/ci.yml/badge.svg)](https://github.com/Myone38/Project-Crypto/actions/workflows/ci.yml)
+[![Codecov](https://codecov.io/gh/Myone38/Project-Crypto/branch/main/graph/badge.svg?token=)](https://codecov.io/gh/Myone38/Project-Crypto)
+
 Brief: Dashboard et moteur de trading pour Bitvavo (Dash + background engine).
+
+---
+
+## Branch protection (recommended)
+
+To require passing CI before merging to `main`:
+
+1. Go to your GitHub repository → Settings → Branches → Branch protection rules.
+2. Click **Add rule** and set **Branch name pattern** to `main`.
+3. Enable **Require status checks to pass before merging** and select the checks to require (e.g., `test` and `lint` from the CI workflow).
+4. Optionally enable **Require linear history** and **Include administrators**.
+
+This ensures PRs cannot be merged unless CI is green.
 
 ## Installation rapide
 
