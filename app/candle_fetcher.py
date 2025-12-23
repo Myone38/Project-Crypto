@@ -12,13 +12,15 @@ class CandleFetcher:
 
     DEFAULT_PAGE_LIMIT = 1000
 
-    def __init__(self, client: BitvavoClient, db: Database, page_limit: int = DEFAULT_PAGE_LIMIT, sleep_between_pages: float = 0.2, rate_limiter=None):
+    def __init__(self, client: BitvavoClient, db: Database, page_limit: int = DEFAULT_PAGE_LIMIT, sleep_between_pages: float = 0.2, rate_limiter=None, autothrottle=None):
         self.client = client
         self.db = db
         self.page_limit = page_limit
         self.sleep_between_pages = sleep_between_pages
         # Rate limiter can be provided or will be created lazily
         self.rate_limiter = rate_limiter
+        # Optional AutoThrottle instance for dynamic throttling on 429s
+        self.autothrottle = autothrottle
 
     # ------------------------------------------------------------------
     # Helpers
@@ -87,6 +89,13 @@ class CandleFetcher:
                 status = getattr(resp, 'status_code', None)
                 if status == 429:
                     increment(REQS_429)
+                    # Trigger auto-throttle if configured
+                    try:
+                        from .autothrottle import AutoThrottle
+                        if hasattr(self, 'autothrottle') and self.autothrottle:
+                            self.autothrottle.record_429()
+                    except Exception:
+                        pass
 
                 resp.raise_for_status()
                 data = resp.json()

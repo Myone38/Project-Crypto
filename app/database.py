@@ -6,7 +6,7 @@ Gestion centralisée de toutes les données persistantes
 import sqlite3
 import os
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional, Tuple
 import threading
 
@@ -285,8 +285,8 @@ class Database:
                 inserted = 0
                 for candle in candles:
                     try:
-                        # Convert milliseconds timestamp to UTC iso string
-                        ts = datetime.utcfromtimestamp(candle[0] / 1000)
+                        # Convert milliseconds timestamp to timezone-aware UTC iso string
+                        ts = datetime.fromtimestamp(candle[0] / 1000, timezone.utc)
                         ts_iso = ts.replace(microsecond=0).isoformat() + 'Z'
 
                         cursor.execute('''

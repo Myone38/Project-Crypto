@@ -11,7 +11,28 @@ from app.candle_fetcher import CandleFetcher
 def main(realtime: bool, interval: str, poll_seconds: int, block: bool = True):
     client = BitvavoClient()
     db = get_database()
-    fetcher = CandleFetcher(client, db)
+
+    # Optionally enable AutoThrottle (set AUTO_THROTTLE=1 or true in env)
+    import os
+    auto_throttle_enabled = os.getenv('AUTO_THROTTLE', '').lower() in ('1', 'true', 'yes')
+    fetcher = None
+    if auto_throttle_enabled:
+        from app.rate_limiter import RateLimiter
+        from app.autothrottle import AutoThrottle
+        rl = RateLimiter()
+        telegram_thread = None
+        # If Telegram env vars are present, create and start the Telegram thread to receive alerts
+        if os.getenv('TELEGRAM_BOT_TOKEN') and os.getenv('TELEGRAM_CHAT_ID'):
+            try:
+                from app.telegram_thread import TelegramThread
+                telegram_thread = TelegramThread(None)
+                telegram_thread.start()
+            except Exception:
+                telegram_thread = None
+        at = AutoThrottle(rl, telegram_thread=telegram_thread)
+        fetcher = CandleFetcher(client, db, rate_limiter=rl, autothrottle=at)
+    else:
+        fetcher = CandleFetcher(client, db)
 
     markets = ["BTC-EUR", "TAO-EUR"]
 

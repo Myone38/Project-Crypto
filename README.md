@@ -67,6 +67,8 @@ Le projet inclut un fichier `.pre-commit-config.yaml` qui exécute `ruff --fix` 
 - Le projet utilise `python-bitvavo-api` pour communiquer avec Bitvavo.
 - Le bot lit d'abord les variables d'environnement; si elles sont absentes, il tente un fallback sur `config/credentials.json`.
 
+- **AutoThrottle (optionnel)**: le projet inclut `app/autothrottle.py` — créez un `AutoThrottle` attaché à votre `RateLimiter` et passez-le à `CandleFetcher` pour réduire automatiquement la capacité en cas de 429 répétés. Vous pouvez configurer `threshold`, `window_seconds`, `cooldown_seconds` et `reduction_factor`. L'envoi d'alertes Telegram est optionnel via un `TelegramThread`.
+
 ---
 
 ## Continuous Integration (CI) ✅
@@ -106,6 +108,12 @@ python scripts/update_candles.py --realtime --interval 1m --no-block
 ```
 
 ### Metrics (in-process)
+
+### AutoThrottle (optional)
+
+- Enable automatic throttling by setting `AUTO_THROTTLE=1` in the environment. When enabled, the runner creates a `RateLimiter` and an `AutoThrottle` instance that will reduce capacity when multiple `429` responses occur and will restore after a cooldown.
+- To receive Telegram alerts about throttling events, set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in your environment.
+
 
 - The updater emits simple in-process metrics via `app.metrics`:
   - `backfill_inserted_<MARKET>` — number of candles inserted during backfill
