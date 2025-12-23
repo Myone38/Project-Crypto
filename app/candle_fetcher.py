@@ -38,9 +38,15 @@ class CandleFetcher:
     # ------------------------------------------------------------------
     # Low-level HTTP fetch
     # ------------------------------------------------------------------
+    MAX_RETRIES = 5
+    BACKOFF_BASE = 0.25  # seconds
+
     def _fetch_range(self, market: str, interval: str, start_ms: Optional[int] = None, end_ms: Optional[int] = None, limit: Optional[int] = None) -> List[List]:
-        """Fetch candles from Bitvavo REST API. Returns list like [[ts_ms, open, high, low, close, volume], ...]"""
-        url = f"{self.client.BASE_URL}/candles/{market}/{interval}"
+        """Fetch candles from Bitvavo REST API with simple retry/backoff.
+        Returns list like [[ts_ms, open, high, low, close, volume], ...]
+        Raises requests.HTTPError on unrecoverable failures."""
+        base_url = getattr(self.client, 'BASE_URL', BitvavoClient.BASE_URL)
+        url = f"{base_url}/candles/{market}/{interval}"
         params = {}
         if limit:
             params['limit'] = limit
@@ -49,18 +55,53 @@ class CandleFetcher:
         if end_ms is not None:
             params['end'] = int(end_ms)
 
-        resp = requests.get(url, params=params)
-        try:
-            # Update client's rate-limit info if available
-            self.client._update_rate_limit(resp)
-        except Exception:
-            pass
+        last_exc = None
+        for attempt in range(self.MAX_RETRIES):
+            resp = requests.get(url, params=params)
+            try:
+                # Update client's rate-limit info if available
+                try:
+                    self.client._update_rate_limit(resp)
+                except Exception:
+                    pass
 
-        resp.raise_for_status()
-        data = resp.json()
+                resp.raise_for_status()
+                data = resp.json()
+                return data
+            except requests.HTTPError as e:
+                last_exc = e
+                status = getattr(resp, 'status_code', None)
+                retry_after = None
+                try:
+                    retry_after = resp.headers.get('Retry-After') or resp.headers.get('retry-after')
+                except Exception:
+                    retry_after = None
 
-        # Data format expected: [[timestamp, open, high, low, close, volume], ...]
-        return data
+                # If rate-limited (429) or server error, backoff and retry
+                if status == 429 or (500 <= (status or 0) < 600):
+                    wait = (2 ** attempt) * self.BACKOFF_BASE
+                    if retry_after:
+                        try:
+                            wait = max(wait, float(retry_after))
+                        except Exception:
+                            pass
+                    print(f"⚠️ Rate limit/server error ({status}), retrying after {wait}s (attempt {attempt + 1})")
+                    time.sleep(wait)
+                    continue
+                # For other errors, do not retry
+                raise
+            except Exception as e:
+                last_exc = e
+                # network-level issues: retry with backoff
+                wait = (2 ** attempt) * self.BACKOFF_BASE
+                print(f"⚠️ Network error: {e}, retrying after {wait}s (attempt {attempt + 1})")
+                time.sleep(wait)
+                continue
+
+        # If we reach here, all retries failed
+        if last_exc:
+            raise last_exc
+        return []
 
     # ------------------------------------------------------------------
     # Backfill logic
@@ -134,7 +175,50 @@ class CandleFetcher:
             print(f"ℹ️ Latest {latest} is older than now, backfilling recent range ({latest + timedelta(milliseconds=1)} → {now})")
             total_inserted += self.backfill_market(market, interval, latest + timedelta(milliseconds=1), now)
 
-        # Optionally: check for internal gaps (not implemented here)
+        # Check and fill internal gaps between earliest and latest
+        # This will detect missing candles ranges and call backfill on them
+        gaps_inserted = self.detect_and_backfill_gaps(market, interval)
+        total_inserted += gaps_inserted
+
+        return total_inserted
+
+    def detect_and_backfill_gaps(self, market: str, interval: str, max_gap_multiplier: float = 1.5) -> int:
+        """Detect internal gaps between stored earliest and latest candles and backfill them.
+        max_gap_multiplier: consider a gap when delta > (interval_ms * multiplier)
+        Returns total inserted from gap backfills."""
+        earliest = getattr(self.db, 'get_earliest_candle_timestamp', lambda m, i: None)(market, interval)
+        latest = getattr(self.db, 'get_latest_candle_timestamp', lambda m, i: None)(market, interval)
+        if earliest is None or latest is None:
+            return 0
+
+        # Fetch all timestamps in the range (use large limit)
+        timestamps = []
+        try:
+            rows = self.db.get_candles_range(market, interval, earliest, latest)
+            for r in rows:
+                # stored as ISO strings; parse to timezone-aware datetimes
+                ts = datetime.fromisoformat(r['timestamp'].rstrip('Z')).replace(tzinfo=timezone.utc)
+                timestamps.append(ts)
+        except Exception as e:
+            print(f"⚠️ Error fetching candles for gap detection: {e}")
+            return 0
+
+        if not timestamps:
+            return 0
+
+        timestamps.sort()
+        interval_ms = self._interval_to_millis(interval)
+        total_inserted = 0
+
+        for a, b in zip(timestamps, timestamps[1:]):
+            delta_ms = (b - a).total_seconds() * 1000
+            if delta_ms > interval_ms * max_gap_multiplier:
+                # There is a gap between a and b
+                gap_start = a + timedelta(milliseconds=interval_ms)
+                gap_end = b - timedelta(milliseconds=interval_ms)
+                print(f"ℹ️ Detected gap for {market} {interval}: {a} → {b} (backfilling {gap_start} → {gap_end})")
+                inserted = self.backfill_market(market, interval, gap_start, gap_end)
+                total_inserted += inserted
 
         return total_inserted
 
