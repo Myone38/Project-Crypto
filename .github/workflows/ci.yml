@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -26,8 +28,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install pre-commit
       - name: Run pre-commit checks
+        shell: bash
         run: |
-          pre-commit run --all-files
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # Fetch base branch to compute changed files
+            git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1 || true
+            files=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD)
+            if [ -n "$files" ]; then
+              echo "Running pre-commit on changed files:"
+              echo "$files"
+              echo "$files" | xargs pre-commit run --files
+            else
+              echo "No changed files to check"
+            fi
+          else
+            # For push or scheduled runs, run a full check to ensure repo-wide consistency
+            pre-commit run --all-files
+          fi
 
   lint:
     needs: precommit

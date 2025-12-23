@@ -75,5 +75,5 @@ A GitHub Actions workflow (`.github/workflows/ci.yml`) runs the pre-commit check
 
 A new **auto-fix** job runs `ruff --fix` on pull requests and will open a pull request with the formatting/lint fixes when changes are made automatically (labelled `autofix`).
 
-Additionally, the CI now runs `pre-commit` checks to ensure hooks pass on the runner (same checks as your local `pre-commit` installation).
+CI runs `pre-commit` on changed files for pull requests (fast feedback) and executes `pre-commit run --all-files` on pushes to `main` to ensure repository-wide consistency (or on scheduled runs if configured).
 
