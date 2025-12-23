@@ -71,7 +71,9 @@ Le projet inclut un fichier `.pre-commit-config.yaml` qui exécute `ruff --fix` 
 
 ## Continuous Integration (CI) ✅
 
-A GitHub Actions workflow (`.github/workflows/ci.yml`) runs the test suite on every push and pull request targeting `main`.
+A GitHub Actions workflow (`.github/workflows/ci.yml`) runs the pre-commit checks, linting and test suite on every push and pull request targeting `main`.
 
 A new **auto-fix** job runs `ruff --fix` on pull requests and will open a pull request with the formatting/lint fixes when changes are made automatically (labelled `autofix`).
+
+Additionally, the CI now runs `pre-commit` checks to ensure hooks pass on the runner (same checks as your local `pre-commit` installation).
 
