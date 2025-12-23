@@ -22,24 +22,12 @@ def main(realtime: bool, interval: str, poll_seconds: int, block: bool = True):
 
     # Optionally start realtime
     if realtime:
-        stop_event = threading.Event()
-        threads = []
-        for m in markets:
-            t = threading.Thread(target=fetcher.start_realtime, args=(m, interval, poll_seconds, stop_event), daemon=True)
-            t.start()
-            threads.append(t)
-        if block:
-            try:
-                while True:
-                    pass
-            except KeyboardInterrupt:
-                print("Stopping realtime threads...")
-                stop_event.set()
-                for t in threads:
-                    t.join()
-        else:
-            # Non-blocking mode: return immediately (useful for tests)
-            return
+        # Use RealTimeUpdater for robust realtime behavior and metrics
+        from app.realtime import RealTimeUpdater
+        updater = RealTimeUpdater(markets, interval=interval, poll_seconds=poll_seconds, client=client, db=db)
+        updater.start(block=block)
+        return
+
 
 
 if __name__ == '__main__':
