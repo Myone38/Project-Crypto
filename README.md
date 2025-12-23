@@ -77,3 +77,47 @@ A new **auto-fix** job runs `ruff --fix` on pull requests and will open a pull r
 
 CI runs `pre-commit` on changed files for pull requests (fast feedback) and executes `pre-commit run --all-files` on pushes to `main` to ensure repository-wide consistency (or on scheduled runs if configured).
 
+---
+
+## Candles backfill & realtime updater 🔁
+
+You can backfill historical candles and start a resilient realtime updater (performs an initial backfill, polls the latest candles periodically, and detects internal gaps).
+
+Runner script: `scripts/update_candles.py`
+
+Usage examples:
+
+- Backfill only (no realtime):
+
+```powershell
+python scripts/update_candles.py --interval 1h
+```
+
+- Backfill + start realtime (blocking):
+
+```powershell
+python scripts/update_candles.py --realtime --interval 1m
+```
+
+- Backfill + start realtime (non-blocking useful for tests or supervisory processes):
+
+```powershell
+python scripts/update_candles.py --realtime --interval 1m --no-block
+```
+
+### Metrics (in-process)
+
+- The updater emits simple in-process metrics via `app.metrics`:
+  - `backfill_inserted_<MARKET>` — number of candles inserted during backfill
+  - `latest_inserted_<MARKET>` — number of latest candles inserted during realtime polling
+
+Access metrics programmatically:
+
+```python
+from app.metrics import get_metrics
+print(get_metrics())
+```
+
+---
+
+
