@@ -4,6 +4,13 @@ import time
 import requests
 import os
 
+# Optional dotenv support (local development)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
+
 
 class TelegramThread(threading.Thread):
     """
@@ -41,6 +48,12 @@ class TelegramThread(threading.Thread):
     # LECTURE CREDENTIALS.JSON
     # ---------------------------------------------------------
     def _load_credentials(self, path):
+        # Prefer environment variables for credentials
+        token = os.getenv('TELEGRAM_BOT_TOKEN')
+        chat_id = os.getenv('TELEGRAM_CHAT_ID')
+        if token and chat_id:
+            return token, chat_id
+
         try:
             with open(path, "r") as f:
                 data = json.load(f)

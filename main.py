@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import time
 import sys
 import traceback
+import os
 
 # -------------------------------------------------------------------
 # CONFIGURATION ET INITIALISATION
@@ -37,12 +38,20 @@ try:
         
 except ImportError as e:
     print(f"❌ Erreur d'import: {e}")
-    print("   Vérifiez que le fichier app/engine.py existe")
+    # Friendly suggestion if a missing dependency (bitvavo client) is the cause
+    if 'python_bitvavo_api' in str(e) or 'python-bitvavo-api' in str(e):
+        print("   Dépendance manquante détectée: pip install python-bitvavo-api")
+    else:
+        print("   Vérifiez que le fichier app/engine.py existe")
 except Exception as e:
     print(f"❌ Erreur d'initialisation: {e}")
     traceback.print_exc()
 
 print("-" * 60)
+
+# Petit check au démarrage pour aider le dev : prévenir si aucune clé Bitvavo trouvée
+if not (os.getenv('BITVAVO_API_KEY') and os.getenv('BITVAVO_API_SECRET')) and not os.path.exists(os.path.join('config','credentials.json')):
+    print("⚠️  Aucune clé Bitvavo trouvée. Configurez BITVAVO_API_KEY/BITVAVO_API_SECRET or add config/credentials.json (not recommended).")
 
 # -------------------------------------------------------------------
 # FONCTIONS HELPER
@@ -1190,13 +1199,19 @@ if __name__ == '__main__':
     print("   • Debug: Activé")
     print("=" * 60 + "\n")
     
-    # Lancement avec app.run() comme demandé
+    # Lancement configurable de l'application
+    debug_env = os.getenv('APP_DEBUG', 'False').lower() in ('1', 'true', 'yes')
+    dev_tools = debug_env
+
+    port = int(os.getenv('PORT', '8050'))
+
+
     app.run(
-        debug=True,
+        debug=debug_env,
         host='127.0.0.1',
-        port=8050,
-        dev_tools_ui=True,
-        dev_tools_hot_reload=True,
-        dev_tools_hot_reload_interval=1,
-        dev_tools_silence_routes_logging=False
+        port=port,
+        dev_tools_ui=dev_tools,
+        dev_tools_hot_reload=dev_tools,
+        dev_tools_hot_reload_interval=1 if dev_tools else None,
+        dev_tools_silence_routes_logging=not dev_tools
     )

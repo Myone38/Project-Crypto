@@ -1,7 +1,21 @@
 import json
 import os
 import requests
-from python_bitvavo_api.bitvavo import Bitvavo
+
+# Optional dotenv support (local development): load .env if python-dotenv is installed
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
+
+# Try to import official Bitvavo client; if missing, we'll raise a clear error in __init__
+try:
+    from python_bitvavo_api.bitvavo import Bitvavo
+    _HAS_BITVAVO = True
+except ImportError:
+    Bitvavo = None
+    _HAS_BITVAVO = False
 
 
 class BitvavoClient:
@@ -20,23 +34,34 @@ class BitvavoClient:
 
     def __init__(self):
         # ------------------------------------------------------
-        # CHARGER LES CREDENTIALS
+        # CHARGER LES CREDENTIALS (PREFERENCE: ENV VARS)
         # ------------------------------------------------------
         creds_path = os.path.join("config", "credentials.json")
 
-        try:
-            with open(creds_path, "r") as f:
-                data = json.load(f)
+        api_key = os.getenv('BITVAVO_API_KEY')
+        api_secret = os.getenv('BITVAVO_API_SECRET')
 
-            creds = data.get("bitvavo", {})
-            api_key = creds.get("api_key")
-            api_secret = creds.get("api_secret")
-
-        except Exception as e:
-            raise ValueError(f"[BitvavoClient] Impossible de lire {creds_path} : {e}")
-
+        # Fallback to credentials file if env vars are missing
         if not api_key or not api_secret:
-            raise ValueError("[BitvavoClient] api_key/api_secret absents dans credentials.json")
+            try:
+                with open(creds_path, "r") as f:
+                    data = json.load(f)
+                creds = data.get("bitvavo", {})
+                api_key = api_key or creds.get("api_key")
+                api_secret = api_secret or creds.get("api_secret")
+            except Exception:
+                # File may be absent; we'll validate below and raise a clear error
+                pass
+
+        # Validate credentials presence
+        if not api_key or not api_secret:
+            raise ValueError(
+                "[BitvavoClient] Missing credentials: set BITVAVO_API_KEY and BITVAVO_API_SECRET in environment or provide config/credentials.json"
+            )
+
+        # Ensure dependency is available
+        if not _HAS_BITVAVO:
+            raise ImportError("Missing dependency 'python-bitvavo-api'. Install with: pip install python-bitvavo-api")
 
         # ------------------------------------------------------
         # INITIALISER LE CLIENT OFFICIEL BITVAVO
