@@ -44,6 +44,19 @@ This ensures PRs cannot be merged unless CI is green.
    python main.py
    ```
 
+## Git hooks (optionnel)
+
+Pour exécuter des vérifications locales avant chaque commit, installez `pre-commit` et activez le hook :
+
+```powershell
+pip install -r requirements.txt
+pre-commit install
+# Pour exécuter sur tous les fichiers (exécution initiale)
+pre-commit run --all-files
+```
+
+Le projet inclut un fichier `.pre-commit-config.yaml` qui exécute `ruff --fix` (automatique) ainsi que quelques hooks utiles (`trailing-whitespace`, `end-of-file-fixer`, `check-yaml`).
+
 ## Sécurité
 
 - **Ne commitez jamais** vos clés dans le repo. Le fichier `config/credentials.json` est listé dans `.gitignore` mais il est préférable d'utiliser des variables d'environnement.
