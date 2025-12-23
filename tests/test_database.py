@@ -36,3 +36,8 @@ def test_save_and_get_candles(tmp_path):
 
     res = db.get_candles('BTC-EUR', '1m', limit=10)
     assert len(res) == 2
+
+    # Ensure timestamps are stored as UTC ISO strings ending with 'Z'
+    for c in res:
+        assert isinstance(c['timestamp'], str)
+        assert c['timestamp'].endswith('Z')
