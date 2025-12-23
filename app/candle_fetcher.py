@@ -12,11 +12,13 @@ class CandleFetcher:
 
     DEFAULT_PAGE_LIMIT = 1000
 
-    def __init__(self, client: BitvavoClient, db: Database, page_limit: int = DEFAULT_PAGE_LIMIT, sleep_between_pages: float = 0.2):
+    def __init__(self, client: BitvavoClient, db: Database, page_limit: int = DEFAULT_PAGE_LIMIT, sleep_between_pages: float = 0.2, rate_limiter=None):
         self.client = client
         self.db = db
         self.page_limit = page_limit
         self.sleep_between_pages = sleep_between_pages
+        # Rate limiter can be provided or will be created lazily
+        self.rate_limiter = rate_limiter
 
     # ------------------------------------------------------------------
     # Helpers
@@ -57,6 +59,19 @@ class CandleFetcher:
 
         last_exc = None
         for attempt in range(self.MAX_RETRIES):
+            # Acquire rate limiter token before performing request (lazy init)
+            if getattr(self, 'rate_limiter', None) is None:
+                try:
+                    from .rate_limiter import RateLimiter
+                    self.rate_limiter = RateLimiter()
+                except Exception:
+                    self.rate_limiter = None
+
+            if self.rate_limiter is not None:
+                acquired = self.rate_limiter.wait_for_token(timeout=30)
+                if not acquired:
+                    raise RuntimeError("RateLimiter: failed to acquire token within timeout")
+
             resp = requests.get(url, params=params)
             try:
                 # Update client's rate-limit info if available
@@ -65,8 +80,35 @@ class CandleFetcher:
                 except Exception:
                     pass
 
+                # Update metrics: request attempted
+                from .metrics import increment, REQS_MADE, REQS_429, BACKOFF_SEC
+                increment(REQS_MADE)
+
+                status = getattr(resp, 'status_code', None)
+                if status == 429:
+                    increment(REQS_429)
+
                 resp.raise_for_status()
                 data = resp.json()
+
+                # If headers indicate zero remaining, optionally compute wait
+                try:
+                    remaining = resp.headers.get('bitvavo-ratelimit-remaining')
+                    resetat = resp.headers.get('bitvavo-ratelimit-resetat')
+                    if remaining is not None and int(remaining) == 0 and resetat:
+                        try:
+                            wait_until = float(resetat)
+                            now_ts = time.time()
+                            wait = max(0.0, wait_until - now_ts)
+                            if wait > 0:
+                                increment(BACKOFF_SEC, int(wait))
+                                print(f"⚠️ Rate limit exhausted; sleeping until reset ({wait}s)")
+                                time.sleep(wait)
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
                 return data
             except requests.HTTPError as e:
                 last_exc = e
@@ -85,6 +127,9 @@ class CandleFetcher:
                             wait = max(wait, float(retry_after))
                         except Exception:
                             pass
+                    # count backoff seconds for metrics
+                    from .metrics import increment, BACKOFF_SEC
+                    increment(BACKOFF_SEC, int(wait))
                     print(f"⚠️ Rate limit/server error ({status}), retrying after {wait}s (attempt {attempt + 1})")
                     time.sleep(wait)
                     continue
@@ -94,6 +139,8 @@ class CandleFetcher:
                 last_exc = e
                 # network-level issues: retry with backoff
                 wait = (2 ** attempt) * self.BACKOFF_BASE
+                from .metrics import increment, BACKOFF_SEC
+                increment(BACKOFF_SEC, int(wait))
                 print(f"⚠️ Network error: {e}, retrying after {wait}s (attempt {attempt + 1})")
                 time.sleep(wait)
                 continue
@@ -113,6 +160,14 @@ class CandleFetcher:
         end_ms = int(to_dt.replace(tzinfo=timezone.utc).timestamp() * 1000)
         page_limit = self.page_limit
         interval_ms = self._interval_to_millis(interval)
+
+        # Ensure we have a rate limiter
+        if self.rate_limiter is None:
+            try:
+                from .rate_limiter import RateLimiter
+                self.rate_limiter = RateLimiter()
+            except Exception:
+                self.rate_limiter = None
 
         current_start = start_ms
         while current_start <= end_ms:

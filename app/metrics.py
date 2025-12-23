@@ -18,3 +18,8 @@ def get_metrics() -> Dict[str, int]:
 def reset_metrics() -> None:
     with _metrics_lock:
         _metrics.clear()
+
+# Helper metric names used by the fetcher
+REQS_MADE = 'requests_made'
+REQS_429 = 'requests_429'
+BACKOFF_SEC = 'backoff_seconds_total'
