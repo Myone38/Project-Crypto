@@ -1,5 +1,5 @@
 import types
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 from app.candle_fetcher import CandleFetcher
 

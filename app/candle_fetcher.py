@@ -91,7 +91,6 @@ class CandleFetcher:
                     increment(REQS_429)
                     # Trigger auto-throttle if configured
                     try:
-                        from .autothrottle import AutoThrottle
                         if hasattr(self, 'autothrottle') and self.autothrottle:
                             self.autothrottle.record_429()
                     except Exception:

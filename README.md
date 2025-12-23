@@ -127,5 +127,3 @@ print(get_metrics())
 ```
 
 ---
-
-

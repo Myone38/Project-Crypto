@@ -1,7 +1,5 @@
 """Small runner to backfill BTC-EUR and TAO-EUR and optionally start realtime polling."""
 import argparse
-import threading
-from datetime import datetime, timezone
 
 from app.bitvavo_client import BitvavoClient
 from app.database import get_database

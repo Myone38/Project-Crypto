@@ -118,7 +118,7 @@ class Engine:
             # WALLET avec enrichissement
                 wallet = self.bitvavo.get_wallet()
                 print("WALLET:", wallet)
-            
+
                 if wallet:
                     # ✅ Enrichir chaque item avec la valeur en EUR
                     enriched_wallet = []
@@ -127,7 +127,7 @@ class Engine:
                         available = float(item.get("available", 0))
                         in_order = float(item.get("inOrder", 0))
                         total_qty = available + in_order
-                    
+
                     # Calculer la valeur en EUR
                         if symbol == "EUR":
                             value_eur = total_qty
@@ -138,13 +138,13 @@ class Engine:
                             except Exception as e:
                                 print(f"Erreur prix {symbol}: {e}")
                                 value_eur = 0
-                    
+
                     # Créer un nouvel item enrichi
                         enriched_item = item.copy()
                         enriched_item['total_qty'] = total_qty
                         enriched_item['value_eur'] = value_eur
                         enriched_wallet.append(enriched_item)
-                
+
                     self.state.portfolio = enriched_wallet
 
                 # ORDERS

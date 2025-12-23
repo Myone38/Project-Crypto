@@ -1,6 +1,5 @@
 import time
 import threading
-from datetime import datetime, timezone, timedelta
 from typing import List
 
 from .candle_fetcher import CandleFetcher

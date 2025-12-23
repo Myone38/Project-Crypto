@@ -1,6 +1,5 @@
 import types
 import time
-from datetime import datetime, timezone
 
 from app.realtime import RealTimeUpdater
 from app.metrics import get_metrics, reset_metrics
@@ -18,7 +17,7 @@ def test_realtime_start_and_stop(monkeypatch):
             return None
         def save_candles(self, market, interval, candles):
             return len(candles)
-        def insert_candle(self, market, interval, timestamp, o, h, l, c, v):
+        def insert_candle(self, market, interval, timestamp, o, h, low, c, v):
             return True
 
     db = FakeDB()

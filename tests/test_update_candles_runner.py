@@ -1,5 +1,4 @@
 import types
-from unittest.mock import patch
 
 import scripts.update_candles as runner
 

@@ -1,5 +1,4 @@
-import pytest
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 import types
 
@@ -95,7 +94,7 @@ def test_poll_latest_once_inserts(monkeypatch):
             self.inserted = False
         def get_latest_candle_timestamp(self, market, interval):
             return self.latest
-        def insert_candle(self, market, interval, timestamp, o, h, l, c, v):
+        def insert_candle(self, market, interval, timestamp, o, h, low, c, v):
             self.inserted = True
             return True
 

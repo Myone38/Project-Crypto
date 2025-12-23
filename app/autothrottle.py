@@ -1,8 +1,5 @@
-import os
 import threading
 import time
-from datetime import datetime, timezone
-from typing import Optional
 
 from .metrics import increment
 

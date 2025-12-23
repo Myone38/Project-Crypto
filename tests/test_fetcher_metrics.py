@@ -23,7 +23,7 @@ def test_fetcher_increments_metrics_on_429(monkeypatch):
 
     monkeypatch.setattr('requests.get', fake_get)
     reset_metrics()
-    inserted = fetcher.backfill_market('BTC-EUR', '1h', datetime.now(timezone.utc) - timedelta(hours=1), datetime.now(timezone.utc))
+    fetcher.backfill_market('BTC-EUR', '1h', datetime.now(timezone.utc) - timedelta(hours=1), datetime.now(timezone.utc))
 
     metrics = get_metrics()
     # At least one request attempted and at least one 429 recorded

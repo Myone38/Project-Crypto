@@ -2,10 +2,8 @@ import types
 from datetime import datetime, timezone, timedelta
 import requests
 
-import pytest
 
 from app.candle_fetcher import CandleFetcher
-from app.candle_fetcher import CandleFetcher as CF
 
 
 def test_timestamp_roundtrip(tmp_path):

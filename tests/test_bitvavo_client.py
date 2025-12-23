@@ -1,4 +1,3 @@
-import os
 import pytest
 
 import app.bitvavo_client as mod

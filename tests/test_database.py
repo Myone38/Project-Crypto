@@ -1,7 +1,5 @@
-import os
 from datetime import datetime, timedelta
 
-import pytest
 
 from app.database import Database
 

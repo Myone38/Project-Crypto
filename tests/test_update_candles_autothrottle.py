@@ -1,5 +1,3 @@
-import os
-from importlib import reload
 
 import scripts.update_candles as updater
 
