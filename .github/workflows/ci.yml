@@ -121,15 +121,27 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run tests with coverage
+        shell: bash
         run: |
-          coverage run -m pytest -q
+          set -o pipefail
+          # Capture pytest output to a logfile for diagnostics and still exit with pytest status
+          coverage run -m pytest -q 2>&1 | tee pytest-output.log
+          test_exit=${PIPESTATUS[0]}
           coverage xml -i
+          exit $test_exit
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage.xml
+
+      - name: Upload pytest logs (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-logs
+          path: pytest-output.log
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
